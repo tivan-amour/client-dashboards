@@ -26,6 +26,7 @@ header.top{background:#fff;border-bottom:1px solid var(--line);position:sticky;t
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
 .brand img{height:26px;width:auto;display:block}
 .brand .x{color:#cbd5e1;font-weight:300;font-size:20px}
+.brand #clientLogo{height:30px;max-width:160px;object-fit:contain}
 .brand .client{font-weight:800;font-size:18px;letter-spacing:-.01em;white-space:nowrap}
 .top-right{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}
 .dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block}
@@ -158,7 +159,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
       <div class="brand">
         <img src="https://cdn.prod.website-files.com/68307875dad3d736d90f75e2/68307a100af03166c64f8499_Upwind%20logo%20blk.png" alt="Upwind">
         <span class="x">×</span>
-        <span class="client" id="clientName">Client</span>
+        <span class="client" id="clientName">Client</span><img id="clientLogo" class="hidden" alt="">
       </div>
       <div class="top-right">
         <span class="dot" id="syncDot"></span><span class="lbl" id="syncLbl">Connecting…</span>
@@ -373,6 +374,10 @@ function sortedLog(){ return [...S.callLog].sort((a,b)=>(parseDate(a.date)||0)-(
 function render(){
   const client = S.settings.client || 'Client';
   $('#clientName').textContent = client; $('#footClient').textContent = client;
+  const lg = $('#clientLogo'), logoUrl = String(S.settings.client_logo||'').trim();
+  if (/^https:\/\//.test(logoUrl)) {
+    if (lg.getAttribute('src') !== logoUrl) { lg.onload = () => { lg.classList.remove('hidden'); $('#clientName').classList.add('hidden'); }; lg.onerror = () => { lg.classList.add('hidden'); $('#clientName').classList.remove('hidden'); }; lg.alt = client; lg.src = logoUrl; }
+  } else { lg.classList.add('hidden'); $('#clientName').classList.remove('hidden'); }
   document.title = 'Upwind × ' + client + ' · Outreach Dashboard';
   const closer = S.settings.closer || 'your team';
   $('#heroSub').textContent = `Live results from Upwind's calling team, booking meetings for ${closer}.`;
