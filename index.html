@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="referrer" content="no-referrer">
+<title>Upwind · Outreach Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111827'/%3E%3Cpath d='M8 11c4-3 8 3 12 0s4-2 4-2M8 17c4-3 8 3 12 0s4-2 4-2M8 23c4-3 8 3 12 0' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --soft:#f1f5f9;
+  --accent:#0f766e; --accent-soft:#ccfbf1; --accent2:#2563eb; --warn:#b45309; --warn-soft:#fef3c7;
+  --good:#15803d; --good-soft:#dcfce7; --bad:#b91c1c; --bad-soft:#fee2e2;
+  --radius:14px; --shadow:0 1px 2px rgba(15,23,42,.04),0 4px 16px rgba(15,23,42,.05);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;line-height:1.45}
+a{color:var(--accent2)}
+.wrap{max-width:1240px;margin:0 auto;padding:0 16px}
+header.top{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.topbar{display:flex;align-items:center;gap:14px;min-height:64px;flex-wrap:wrap;padding:8px 0}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand img{height:26px;width:auto;display:block}
+.brand .x{color:#cbd5e1;font-weight:300;font-size:20px}
+.brand .client{font-weight:800;font-size:18px;letter-spacing:-.01em;white-space:nowrap}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block}
+.dot.ok{background:#22c55e}.dot.busy{background:#f59e0b}.dot.err{background:#ef4444}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{border:0;background:transparent;padding:12px 14px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--ink)}
+nav.tabs .badge{background:var(--warn);color:#fff;border-radius:999px;font-size:11px;padding:1px 7px;margin-left:6px}
+main{padding:22px 0 60px}
+.hero{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:18px}
+.hero h1{margin:0;font-size:24px;letter-spacing:-.02em}
+.hero p{margin:4px 0 0;color:var(--muted)}
+.hero .meta{margin-left:auto;color:var(--muted);font-size:12px;text-align:right}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;min-width:0}
+.kpi .label{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.kpi .val{font-size:28px;font-weight:800;letter-spacing:-.02em;margin-top:6px}
+.kpi .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.kpi.hl{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;border-color:#0f172a}
+.kpi.hl .label,.kpi.hl .sub{color:#cbd5e1}
+.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:820px){.two{grid-template-columns:1fr}}
+.three{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+h2{font-size:15px;margin:0 0 12px;letter-spacing:-.01em}
+h2 small{font-weight:500;color:var(--muted);margin-left:6px;font-size:12px}
+.section{margin-top:22px}
+.chartbox{position:relative;height:240px}
+.progress{height:12px;background:var(--soft);border-radius:999px;overflow:hidden;margin:10px 0 6px}
+.progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#14b8a6);border-radius:999px;transition:width .6s}
+.progress.blue > i{background:linear-gradient(90deg,var(--accent2),#60a5fa)}
+.row{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.muted{color:var(--muted)}
+.big{font-size:22px;font-weight:800}
+.funnel .stage{display:grid;grid-template-columns:120px 1fr 70px 80px;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.funnel .stage:last-child{border-bottom:0}
+.funnel .bar{height:22px;background:var(--soft);border-radius:6px;overflow:hidden}
+.funnel .bar i{display:block;height:100%;background:#0f172a;border-radius:6px;min-width:3px}
+.funnel .n{font-weight:700;text-align:right}
+.funnel .p{color:var(--muted);text-align:right;font-size:12px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:#fff}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}
+th{background:#f8fafc;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;position:sticky;top:0;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tfoot td{font-weight:700;background:#f8fafc}
+.cell{width:100%;border:1px solid transparent;background:transparent;font:inherit;color:inherit;padding:4px 6px;border-radius:6px;min-width:60px}
+.cell:hover{border-color:var(--line);background:#fff}
+.cell:focus{outline:none;border-color:var(--accent2);background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+textarea.cell{resize:vertical;min-height:34px;min-width:200px}
+input.cell.num{text-align:right;width:76px}
+select.cell{min-width:150px;cursor:pointer}
+.client-col{background:#fffbeb}
+th.client-col{background:#fef3c7;color:#92400e}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--soft);color:var(--ink);white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)}.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.blue{background:#dbeafe;color:#1d4ed8}
+.btn{border:1px solid var(--ink);background:var(--ink);color:#fff;font:inherit;font-weight:600;padding:9px 14px;border-radius:10px;cursor:pointer}
+.btn.ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+.btn.sm{padding:5px 9px;font-size:12px;border-radius:8px}
+.btn.danger{background:#fff;color:var(--bad);border-color:#fecaca}
+.btn:disabled{opacity:.5;cursor:default}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.toolbar .grow{flex:1}
+form.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+form.entry label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--muted)}
+form.entry input,form.entry select,form.entry textarea{font:inherit;color:var(--ink);padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;min-width:0}
+form.entry textarea{min-height:70px;resize:vertical}
+form.entry .full{grid-column:1/-1}
+form.entry .actions{grid-column:1/-1;display:flex;gap:10px;justify-content:flex-end}
+.callout{border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;font-size:13px}
+.callout.warn{background:var(--warn-soft);border:1px solid #fde68a;color:#78350f}
+.callout.info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a}
+.callout b{font-weight:700}
+.notes{display:grid;gap:10px}
+.note{border-left:3px solid var(--accent);padding:8px 12px;background:#f8fafc;border-radius:0 10px 10px 0}
+.note.neg{border-left-color:#f59e0b}
+.note .h{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.empty{text-align:center;color:var(--muted);padding:28px 10px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(30px);background:#0f172a;color:#fff;padding:10px 16px;border-radius:999px;font-weight:600;font-size:13px;opacity:0;transition:.25s;z-index:50;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#b91c1c}
+.hidden{display:none!important}
+.legend-key{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-right:12px}
+.legend-key i{width:12px;height:12px;border-radius:3px;display:inline-block}
+footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
+.gate{min-height:80vh;display:flex;align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:14px;color:var(--muted)}
+.gate img{height:34px}
+.mlist{display:grid;gap:12px}
+.mcard{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.mcard.needs{border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.15)}
+.mcard .info{padding:16px;min-width:0}
+.mcard .client{padding:16px;background:#fffbeb;border-left:1px solid #fde68a;display:grid;gap:10px;align-content:start}
+.mcard .client .ttl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#92400e}
+.mcard .client label{display:grid;gap:4px;font-size:12px;font-weight:600;color:#78350f}
+.mcard .client .cell{border-color:#fde68a;background:#fff;min-width:0}
+.mcard .who{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.mcard .who b{font-size:16px}
+.mcard .when{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px}
+.mcard .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px;font-size:13px}
+.mcard .kv div span{display:block;font-size:11px;color:var(--muted);font-weight:600}
+.mcard .cnotes{margin-top:10px;background:#f8fafc;border-radius:10px;padding:10px 12px;font-size:13px}
+.mcard details{margin-top:10px}
+.mcard details summary{cursor:pointer;color:var(--muted);font-size:12px;font-weight:600}
+.mcard .edit{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:10px}
+.mcard .edit label{display:grid;gap:3px;font-size:11px;color:var(--muted);font-weight:600}
+.mcard .edit .cell{border-color:var(--line);min-width:0}
+.mcard .edit .wide{grid-column:1/-1}
+@media (max-width:760px){.mcard{grid-template-columns:1fr}.mcard .client{border-left:0;border-top:1px solid #fde68a}}
+@media (max-width:720px){
+  .hero .meta{margin-left:0;text-align:left}
+  .kpi .val{font-size:24px}
+  .funnel .stage{grid-template-columns:90px 1fr 50px 60px}
+  .brand img{height:22px}.brand .client{font-size:16px}
+  .top-right .lbl{display:none}
+}
+</style>
+</head>
+<body>
+<div id="gate" class="gate hidden">
+  <img src="https://cdn.prod.website-files.com/68307875dad3d736d90f75e2/68307a100af03166c64f8499_Upwind%20logo%20blk.png" alt="Upwind">
+  <div>This link is incomplete. Please use the full dashboard link Upwind sent you.</div>
+</div>
+
+<div id="app" class="hidden">
+<header class="top">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <img src="https://cdn.prod.website-files.com/68307875dad3d736d90f75e2/68307a100af03166c64f8499_Upwind%20logo%20blk.png" alt="Upwind">
+        <span class="x">×</span>
+        <span class="client" id="clientName">Client</span>
+      </div>
+      <div class="top-right">
+        <span class="dot" id="syncDot"></span><span class="lbl" id="syncLbl">Connecting…</span>
+        <button class="btn ghost sm" id="refreshBtn" title="Refresh">↻ Refresh</button>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="overview" class="on">Overview</button>
+      <button data-tab="meetings">Booked Meetings <span class="badge hidden" id="pendingBadge">0</span></button>
+      <button data-tab="calllog">Daily Call Log</button>
+      <button data-tab="lists">Lists &amp; Weeks</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- OVERVIEW -->
+  <section data-view="overview">
+    <div class="hero">
+      <div>
+        <h1>Phone Outreach Dashboard</h1>
+        <p id="heroSub">Live results from Upwind's calling team.</p>
+      </div>
+      <div class="meta" id="heroMeta"></div>
+    </div>
+
+    <div id="pendingCallout" class="callout warn hidden" style="margin-bottom:14px">
+      <div>📅</div>
+      <div><b id="pendingText"></b> Let us know how they went on the <a href="#" data-goto="meetings">Booked Meetings</a> tab. It takes 10 seconds, and it's how we find you more people like your best calls.</div>
+    </div>
+
+    <div class="grid kpis" id="kpis"></div>
+
+    <div class="grid three section">
+      <div class="card">
+        <h2>Current block <small id="blockLbl"></small></h2>
+        <div class="row"><span class="big" id="blockNow">0</span><span class="muted" id="blockOf"></span></div>
+        <div class="progress"><i id="blockBar" style="width:0"></i></div>
+        <div class="row muted"><span id="blockDone"></span><span id="blockLeft"></span></div>
+      </div>
+      <div class="card">
+        <h2>This week <small id="weekLbl"></small></h2>
+        <div class="row"><span class="big" id="weekNow">0</span><span class="muted" id="weekOf"></span></div>
+        <div class="progress blue"><i id="weekBar" style="width:0"></i></div>
+        <div class="row muted"><span id="weekConv"></span><span id="weekMtg"></span></div>
+      </div>
+      <div class="card">
+        <h2>Meeting results <small>from <span class="closerFirst">client</span>'s updates</small></h2>
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;text-align:center" id="mtgResults"></div>
+      </div>
+    </div>
+
+    <div class="grid two section">
+      <div class="card"><h2>Calls per month</h2><div class="chartbox"><canvas id="chMonthly"></canvas></div></div>
+      <div class="card"><h2>Cumulative meetings booked</h2><div class="chartbox"><canvas id="chCum"></canvas></div></div>
+      <div class="card"><h2>Weekly conversion rates</h2><div class="chartbox"><canvas id="chWeekly"></canvas></div></div>
+      <div class="card"><h2>Meetings booked by list</h2><div class="chartbox"><canvas id="chByList"></canvas></div></div>
+    </div>
+
+    <div class="grid two section">
+      <div class="card funnel">
+        <h2>Conversion funnel <small>all time</small></h2>
+        <div id="funnel"></div>
+      </div>
+      <div class="card">
+        <h2>From the phones <small>what our callers are hearing</small></h2>
+        <div class="notes" id="feed"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MEETINGS -->
+  <section data-view="meetings" class="hidden">
+    <div class="hero">
+      <div><h1>Booked Meetings</h1><p>Every meeting our team has put on the calendar.</p></div>
+    </div>
+    <div class="callout info" style="margin-bottom:14px">
+      <div>👋</div>
+      <div><b><span class="closerFirst">Client</span>:</b> after each meeting, just fill in the <b>yellow panel</b>: did it happen, how it went, and any feedback for us. It saves automatically. <b>Upwind callers:</b> add each meeting with the button below the moment you book it.</div>
+    </div>
+    <div class="toolbar">
+      <select class="cell" id="mtgFilter" style="max-width:220px;border-color:var(--line);background:#fff">
+        <option value="all">All meetings</option>
+        <option value="needs">Needs an update</option>
+        <option value="upcoming">Upcoming</option>
+        <option value="held">Held</option>
+      </select>
+      <div class="grow"></div>
+      <button class="btn" id="addMtgBtn">+ Add booked meeting</button>
+    </div>
+    <div class="card hidden" id="mtgFormCard" style="margin-bottom:14px">
+      <h2>New booked meeting</h2>
+      <form class="entry" id="mtgForm">
+        <label>Booked on<input type="date" name="booked_date" required></label>
+        <label>Meeting date<input type="date" name="meeting_date"></label>
+        <label>Name<input name="name" required></label>
+        <label>Title<input name="title"></label>
+        <label>Company<input name="company" required></label>
+        <label>Phone<input name="phone"></label>
+        <label>Email<input name="email" type="email"></label>
+        <label>List<select name="list" data-opts="lists"></select></label>
+        <label>Caller<select name="caller" data-opts="callers"></select></label>
+        <label class="full">Caller notes (what they said, why it's a fit)<textarea name="caller_notes"></textarea></label>
+        <div class="actions"><button type="button" class="btn ghost" data-cancel>Cancel</button><button class="btn">Save meeting</button></div>
+      </form>
+    </div>
+    <div class="mlist" id="mtgTable"></div>
+  </section>
+
+  <!-- CALL LOG -->
+  <section data-view="calllog" class="hidden">
+    <div class="hero">
+      <div><h1>Daily Call Log</h1><p>Callers: log each session at the end of your shift. One row per list per day.</p></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h2>Log a calling session</h2>
+      <form class="entry" id="logForm">
+        <label>Date<input type="date" name="date" required></label>
+        <label>Caller<select name="caller" data-opts="callers"></select></label>
+        <label>Prospect list<select name="list" data-opts="lists"></select></label>
+        <label>Script<select name="script" data-opts="scripts"></select></label>
+        <label>Calls made<input type="number" min="0" name="calls" required></label>
+        <label>Conversations<input type="number" min="0" name="conversations" value="0"></label>
+        <label>Interested<input type="number" min="0" name="interested" value="0"></label>
+        <label>Meetings booked<input type="number" min="0" name="meetings" value="0"></label>
+        <label class="full">What worked<textarea name="what_worked" placeholder="Openers, angles or objections that landed"></textarea></label>
+        <label class="full">What didn't work<textarea name="what_didnt" placeholder="Where calls stalled, common pushback, bad data"></textarea></label>
+        <div class="actions"><button class="btn" id="logSubmit">Save session</button></div>
+      </form>
+    </div>
+    <div class="tablewrap"><table id="logTable"></table></div>
+  </section>
+
+  <!-- LISTS & WEEKS -->
+  <section data-view="lists" class="hidden">
+    <div class="hero"><div><h1>Lists &amp; Weeks</h1><p>Performance by prospect list and by week.</p></div></div>
+    <h2>Performance by prospect list</h2>
+    <div class="tablewrap"><table id="listTable"></table></div>
+    <h2 class="section">Weekly rollup</h2>
+    <div class="tablewrap"><table id="weekTable"></table></div>
+  </section>
+</main>
+<footer>Prepared by Upwind · <span id="footClient"></span> · Questions? Text Tivan at 240-601-3642</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+// ---------- config from link ----------
+const key = (location.hash || '').replace(/^#\/?/, '').split(/[?&]/)[0].trim();
+if (!/^[A-Za-z0-9_-]{20,}$/.test(key)) { document.getElementById('gate').classList.remove('hidden'); return; }
+const API = 'https://script.google.com/macros/s/' + key + '/exec';
+document.getElementById('app').classList.remove('hidden');
+
+// ---------- state ----------
+let S = { callLog: [], meetings: [], settings: {} };
+const $ = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+const num = v => { const n = parseFloat(String(v||'').replace(/[$,]/g,'')); return isFinite(n) ? n : 0; };
+const pct = (a,b) => b ? (a/b*100) : null;
+const fmtPct = v => v==null ? '—' : (v>=10 ? v.toFixed(0) : v.toFixed(1)) + '%';
+const fmtN = n => Math.round(n).toLocaleString();
+const fmtMoney = n => '$' + Math.round(n).toLocaleString();
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayISO = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+function parseDate(s){ if(!s) return null; s=String(s).trim(); let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]); m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if(m){let y=+m[3]; if(y<100) y+=2000; return new Date(y,+m[1]-1,+m[2]);} const d=new Date(s); return isNaN(d)?null:d; }
+const iso = d => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
+const nice = d => d ? d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '';
+function weekStart(d){ const x=new Date(d); const wd=(x.getDay()+6)%7; x.setDate(x.getDate()-wd); x.setHours(0,0,0,0); return x; }
+const opts = k => String(S.settings[k]||'').split(';').map(s=>s.trim()).filter(Boolean);
+
+const TOOK = ['', 'Yes, it happened', 'No-show', 'Rescheduled', 'Cancelled'];
+const OUTCOME = ['', 'Good fit, next steps', 'Proposal / quote sent', 'Closed, won', 'Not a fit', 'Bad timing, revisit later', 'Wrong person'];
+
+// ---------- network ----------
+const dot=$('#syncDot'), lbl=$('#syncLbl');
+function status(state, text){ dot.className='dot '+state; lbl.textContent=text; }
+function toast(msg, err){ const t=$('#toast'); t.textContent=msg; t.className='toast show'+(err?' err':''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='toast',2200); }
+async function load(silent){
+  if(!silent) status('busy','Loading…');
+  try{
+    const r = await fetch(API, {cache:'no-store'});
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'Load failed');
+    S = { callLog: j.callLog||[], meetings: j.meetings||[], settings: j.settings||{} };
+    render();
+    status('ok', 'Updated ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}));
+  }catch(e){ status('err','Offline — retrying'); console.error(e); if(!silent) toast('Could not load data. Retrying…', true); }
+}
+let pending = 0;
+async function post(body){
+  pending++; status('busy','Saving…');
+  try{
+    const r = await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(body)});
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'Save failed');
+    return j;
+  } finally { pending--; if(!pending) status('ok','Saved ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'})); }
+}
+async function saveRow(sheet, row){
+  try{ const j = await post({action:'upsert', sheet, row}); if(!row.id) row.id=j.id; toast('Saved ✓'); return true; }
+  catch(e){ console.error(e); toast('Save failed. Check your connection.', true); status('err','Save failed'); return false; }
+}
+
+// ---------- metrics ----------
+function totals(rows){ return rows.reduce((a,r)=>{a.calls+=num(r.calls);a.conv+=num(r.conversations);a.int+=num(r.interested);a.mtg+=num(r.meetings);return a;},{calls:0,conv:0,int:0,mtg:0}); }
+function sortedLog(){ return [...S.callLog].sort((a,b)=>(parseDate(a.date)||0)-(parseDate(b.date)||0)); }
+
+// ---------- render ----------
+function render(){
+  const client = S.settings.client || 'Client';
+  $('#clientName').textContent = client; $('#footClient').textContent = client;
+  document.title = 'Upwind × ' + client + ' · Outreach Dashboard';
+  const closer = S.settings.closer || 'your team';
+  $('#heroSub').textContent = `Live results from Upwind's calling team, booking meetings for ${closer}.`;
+  $$('.closerFirst').forEach(e=>e.textContent=(S.settings.closer||'Client').split(' ')[0]);
+  fillSelects();
+  renderOverview(); renderMeetings(); renderLog(); renderLists();
+}
+
+function fillSelects(){
+  $$('select[data-opts]').forEach(sel=>{
+    const cur = sel.value; const list = opts(sel.dataset.opts);
+    sel.innerHTML = list.map(o=>`<option>${esc(o)}</option>`).join('') + (sel.dataset.opts!=='lists'?'':'');
+    if(list.includes(cur)) sel.value=cur;
+  });
+}
+
+let charts = {};
+function chart(id, cfg){ if(!window.Chart) return; if(charts[id]) charts[id].destroy(); charts[id] = new Chart($('#'+id), cfg); }
+if(window.Chart){ Chart.defaults.font.family = 'Inter, system-ui, sans-serif'; Chart.defaults.color = '#64748b'; Chart.defaults.plugins.legend.labels.boxWidth = 12; }
+
+function renderOverview(){
+  const log = sortedLog(); const t = totals(log);
+  const meetings = S.meetings;
+  const mtgCount = Math.max(t.mtg, 0);
+  const kp = [
+    ['Total calls', fmtN(t.calls), 'dials made'],
+    ['Conversations', fmtN(t.conv), 'decision makers reached'],
+    ['Interested', fmtN(t.int), 'wanted to hear more'],
+    ['Meetings booked', fmtN(mtgCount), 'on ' + (S.settings.closer||'the') + "'s calendar", true],
+    ['Connection rate', fmtPct(pct(t.conv,t.calls)), 'conversations ÷ calls'],
+    ['Interest rate', fmtPct(pct(t.int,t.conv)), 'interested ÷ conversations'],
+    ['Book rate', fmtPct(pct(t.mtg,t.int)), 'meetings ÷ interested'],
+  ];
+  $('#kpis').innerHTML = kp.map(k=>`<div class="card kpi${k[3]?' hl':''}"><div class="label">${k[0]}</div><div class="val">${k[1]}</div><div class="sub">${esc(k[2])}</div></div>`).join('');
+
+  // block
+  const bs = num(S.settings.block_size)||375, price = num(S.settings.block_price)||0;
+  const done = Math.floor(t.calls / bs), inBlock = t.calls - done*bs;
+  $('#blockLbl').textContent = `#${done+1} · ${bs} calls per block`;
+  $('#blockNow').textContent = fmtN(inBlock);
+  $('#blockOf').textContent = `of ${bs} calls`;
+  $('#blockBar').style.width = Math.min(100, inBlock/bs*100) + '%';
+  $('#blockDone').textContent = `${done} block${done===1?'':'s'} completed`;
+  $('#blockLeft').textContent = `${fmtN(bs-inBlock)} to go`;
+
+  // week
+  const wt = num(S.settings.weekly_target)||375; const ws = weekStart(new Date());
+  const wk = totals(log.filter(r=>{const d=parseDate(r.date); return d && d>=ws;}));
+  $('#weekLbl').textContent = 'since ' + nice(ws);
+  $('#weekNow').textContent = fmtN(wk.calls); $('#weekOf').textContent = `of ~${wt} target`;
+  $('#weekBar').style.width = Math.min(100, wk.calls/wt*100) + '%';
+  $('#weekConv').textContent = `${wk.conv} conversations`; $('#weekMtg').textContent = `${wk.mtg} meetings`;
+
+  // meeting results
+  const today = new Date(); today.setHours(0,0,0,0);
+  const held = meetings.filter(m=>m.took_place==='Yes, it happened').length;
+  const decided = meetings.filter(m=>['Yes, it happened','No-show'].includes(m.took_place)).length;
+  const upcoming = meetings.filter(m=>{const d=parseDate(m.meeting_date); return d && d>=today && !m.took_place;}).length;
+  const pipeline = meetings.reduce((a,m)=>a+num(m.deal_value),0);
+  const good = meetings.filter(m=>['Good fit, next steps','Proposal / quote sent','Closed, won'].includes(m.outcome)).length;
+  const cells = [[upcoming,'Upcoming'],[held,'Held'],[decided?fmtPct(held/decided*100):'—','Show rate'],[good,'Good fit or better'],[meetings.filter(m=>m.outcome==='Closed, won').length,'Closed, won'],[pipeline?fmtMoney(pipeline):'—','Pipeline value']];
+  $('#mtgResults').innerHTML = cells.map(c=>`<div style="background:#f8fafc;border-radius:10px;padding:10px 4px"><div style="font-weight:800;font-size:18px">${c[0]}</div><div class="muted" style="font-size:11px">${c[1]}</div></div>`).join('');
+
+  // pending callout
+  const needs = needsUpdate();
+  $('#pendingBadge').textContent = needs.length; $('#pendingBadge').classList.toggle('hidden', !needs.length);
+  $('#pendingCallout').classList.toggle('hidden', !needs.length);
+  $('#pendingText').textContent = `${needs.length} meeting${needs.length===1?' has':'s have'} happened since we last heard from you.`;
+
+  // hero meta
+  const last = log.length ? parseDate(log[log.length-1].date) : null;
+  const first = log.length ? parseDate(log[0].date) : parseDate(S.settings.start_date);
+  $('#heroMeta').innerHTML = (first?`Program started ${esc(nice(first))}`:'') + (last?`<br>Last calling day ${esc(nice(last))}`:'');
+
+  // monthly
+  const byMonth = {}; log.forEach(r=>{const d=parseDate(r.date); if(!d) return; const k=d.toLocaleDateString(undefined,{month:'short',year:'2-digit'}); byMonth[k]=(byMonth[k]||0)+num(r.calls);});
+  chart('chMonthly',{type:'bar',data:{labels:Object.keys(byMonth),datasets:[{label:'Calls',data:Object.values(byMonth),backgroundColor:'#0f172a',borderRadius:6,maxBarThickness:46}]},options:baseOpts()});
+  // cumulative meetings by date
+  let c=0; const cumL=[], cumD=[]; log.forEach(r=>{c+=num(r.meetings); cumL.push(nice(parseDate(r.date))); cumD.push(c);});
+  chart('chCum',{type:'line',data:{labels:cumL,datasets:[{label:'Meetings',data:cumD,borderColor:'#0f766e',backgroundColor:'rgba(15,118,110,.12)',fill:true,tension:.3,pointRadius:2}]},options:baseOpts()});
+  // weekly rates
+  const wks = weekly();
+  chart('chWeekly',{type:'line',data:{labels:wks.map(w=>nice(w.start)),datasets:[
+    {label:'Connection',data:wks.map(w=>pct(w.conv,w.calls)),borderColor:'#2563eb',tension:.3},
+    {label:'Interest',data:wks.map(w=>pct(w.int,w.conv)),borderColor:'#f59e0b',tension:.3},
+    {label:'Book',data:wks.map(w=>pct(w.mtg,w.int)),borderColor:'#0f766e',tension:.3}]},
+    options:Object.assign(baseOpts(true),{scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}})});
+  // by list
+  const bl = byList();
+  chart('chByList',{type:'bar',data:{labels:bl.map(l=>shortList(l.list)),datasets:[{label:'Meetings',data:bl.map(l=>l.mtg),backgroundColor:'#0f766e',borderRadius:6,maxBarThickness:46},{label:'Conversations',data:bl.map(l=>l.conv),backgroundColor:'#cbd5e1',borderRadius:6,maxBarThickness:46}]},options:baseOpts(true)});
+
+  // funnel
+  const st=[['Calls made',t.calls],['Conversations',t.conv],['Interested',t.int],['Meetings',t.mtg]];
+  $('#funnel').innerHTML = st.map((s,i)=>`<div class="stage"><div>${s[0]}</div><div class="bar"><i style="width:${t.calls?Math.max(1,s[1]/t.calls*100):0}%"></i></div><div class="n">${fmtN(s[1])}</div><div class="p">${i?fmtPct(pct(s[1],st[i-1][1]))+' of prior':'100%'}</div></div>`).join('');
+
+  // feed
+  const notes=[]; [...log].reverse().forEach(r=>{ if(r.what_worked&&!/^n\/?a$/i.test(r.what_worked)) notes.push({d:r.date,t:r.what_worked,pos:true,l:r.list}); if(r.what_didnt&&!/^n\/?a$/i.test(r.what_didnt)) notes.push({d:r.date,t:r.what_didnt,pos:false,l:r.list}); });
+  $('#feed').innerHTML = notes.length ? notes.slice(0,6).map(n=>`<div class="note ${n.pos?'':'neg'}"><div class="h">${esc(nice(parseDate(n.d)))} · ${n.pos?'What worked':'What we learned'}${n.l?' · '+esc(shortList(n.l)):''}</div>${esc(n.t)}</div>`).join('') : '<div class="empty">Callers\' notes from each session will show up here.</div>';
+}
+function baseOpts(legend){ return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:!!legend,position:'bottom'}},scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'},ticks:{precision:0}},x:{grid:{display:false}}}}; }
+const shortList = l => String(l||'').replace(/^.*?\|\s*/,'').replace(/\s*\|\s*HQ$/,'') || l;
+function weekly(){
+  const m = {}; sortedLog().forEach(r=>{const d=parseDate(r.date); if(!d) return; const k=iso(weekStart(d)); (m[k]=m[k]||{start:weekStart(d),calls:0,conv:0,int:0,mtg:0}); m[k].calls+=num(r.calls); m[k].conv+=num(r.conversations); m[k].int+=num(r.interested); m[k].mtg+=num(r.meetings);});
+  return Object.keys(m).sort().map(k=>m[k]);
+}
+function byList(){
+  const m = {}; S.callLog.forEach(r=>{const k=r.list||'(no list)'; (m[k]=m[k]||{list:k,calls:0,conv:0,int:0,mtg:0}); m[k].calls+=num(r.calls); m[k].conv+=num(r.conversations); m[k].int+=num(r.interested); m[k].mtg+=num(r.meetings);});
+  return Object.values(m).sort((a,b)=>b.calls-a.calls);
+}
+function needsUpdate(){ const today=new Date(); today.setHours(0,0,0,0); return S.meetings.filter(m=>{const d=parseDate(m.meeting_date); return d && d<today && (!m.took_place || (m.took_place==='Yes, it happened' && !m.outcome));}); }
+
+// ---------- meetings ----------
+function sel(name, val, list){ return `<select class="cell" data-f="${name}">${list.map(o=>`<option value="${esc(o)}"${o===val?' selected':''}>${o?esc(o):'Select…'}</option>`).join('')}</select>`; }
+function inp(name,val,type='text',cls=''){ return `<input class="cell ${cls}" type="${type}" data-f="${name}" value="${esc(val)}">`; }
+function ta(name,val){ return `<textarea class="cell" data-f="${name}" rows="2">${esc(val)}</textarea>`; }
+function tookPill(v){ if(!v) return ''; const c = v.startsWith('Yes')?'good':v==='No-show'||v==='Cancelled'?'bad':'warn'; return c; }
+function renderMeetings(){
+  const f = $('#mtgFilter').value; const today=new Date(); today.setHours(0,0,0,0);
+  let rows = [...S.meetings].sort((a,b)=>(parseDate(b.meeting_date)||parseDate(b.booked_date)||0)-(parseDate(a.meeting_date)||parseDate(a.booked_date)||0));
+  const needs = new Set(needsUpdate().map(m=>String(m.id)));
+  if(f==='needs') rows=rows.filter(m=>needs.has(String(m.id)));
+  if(f==='upcoming') rows=rows.filter(m=>{const d=parseDate(m.meeting_date); return d && d>=today;});
+  if(f==='held') rows=rows.filter(m=>m.took_place==='Yes, it happened');
+  const lists = ['', ...opts('lists')], callers = ['', ...opts('callers')];
+  if(!rows.length){ $('#mtgTable').innerHTML = `<div class="card empty">${S.meetings.length?'No meetings match this filter.':'No meetings booked yet. They\'ll appear here the moment we book one.'}</div>`; return; }
+  $('#mtgTable').innerHTML = rows.map(m=>{
+    const md=parseDate(m.meeting_date), up = md && md>=today;
+    const statePill = m.took_place ? `<span class="pill ${tookPill(m.took_place)}">${esc(m.took_place)}</span>` : (up?'<span class="pill blue">Upcoming</span>':(md?'<span class="pill warn">Awaiting update</span>':''));
+    return `<div class="mcard${needs.has(String(m.id))?' needs':''}" data-id="${esc(m.id)}">
+    <div class="info">
+      <div class="who"><b>${esc(m.name||'Unnamed')}</b><span class="muted">${esc([m.title,m.company].filter(Boolean).join(' · '))}</span></div>
+      <div class="when">${md?`<span class="pill">📅 ${esc(md.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))}</span>`:''}${statePill}${m.outcome?`<span class="pill">${esc(m.outcome)}</span>`:''}</div>
+      <div class="kv">
+        ${m.phone?`<div><span>Phone</span><a href="tel:${esc(m.phone)}">${esc(m.phone)}</a></div>`:''}
+        ${m.email?`<div><span>Email</span><a href="mailto:${esc(m.email)}">${esc(m.email)}</a></div>`:''}
+        ${m.list?`<div><span>List</span>${esc(shortList(m.list))}</div>`:''}
+        ${m.caller?`<div><span>Booked by</span>${esc(m.caller)}${m.booked_date?' · '+esc(nice(parseDate(m.booked_date))):''}</div>`:''}
+        ${m.recording_link?`<div><span>Call recording</span><a href="${esc(m.recording_link)}" target="_blank" rel="noopener">Listen ↗</a></div>`:''}
+      </div>
+      ${m.caller_notes?`<div class="cnotes"><b>Caller notes:</b> ${esc(m.caller_notes)}</div>`:''}
+      <details><summary>Edit details (Upwind)</summary>
+        <div class="edit">
+          <label>Name${inp('name',m.name)}</label><label>Title${inp('title',m.title)}</label><label>Company${inp('company',m.company)}</label>
+          <label>Phone${inp('phone',m.phone)}</label><label>Email${inp('email',m.email)}</label>
+          <label>Meeting date${inp('meeting_date',toISOish(m.meeting_date),'date')}</label><label>Booked on${inp('booked_date',toISOish(m.booked_date),'date')}</label>
+          <label>List${sel('list',m.list,lists.includes(m.list)?lists:[...lists,m.list])}</label><label>Caller${sel('caller',m.caller,callers.includes(m.caller)?callers:[...callers,m.caller])}</label>
+          <label>Recording link${inp('recording_link',m.recording_link,'url')}</label>
+          <label class="wide">Caller notes${ta('caller_notes',m.caller_notes)}</label>
+          <div><button class="btn danger sm" data-del="Booked Meetings">Delete meeting</button></div>
+        </div>
+      </details>
+    </div>
+    <div class="client">
+      <div class="ttl">For ${esc((S.settings.closer||'the client').split(' ')[0])} to update</div>
+      <label>Did the meeting happen?${sel('took_place',m.took_place,TOOK)}</label>
+      <label>How did it go?${sel('outcome',m.outcome,OUTCOME)}</label>
+      <label>Potential deal value (optional)${inp('deal_value',m.deal_value,'text')}</label>
+      <label>Feedback for Upwind${ta('client_notes',m.client_notes)}</label>
+    </div></div>`; }).join('');
+}
+function toISOish(v){ const d=parseDate(v); return d?iso(d):''; }
+
+// ---------- call log ----------
+function renderLog(){
+  const rows = [...S.callLog].sort((a,b)=>(parseDate(b.date)||0)-(parseDate(a.date)||0));
+  const lists=['',...opts('lists')], scripts=['',...opts('scripts')], callers=['',...opts('callers')];
+  const t = totals(rows);
+  const head = `<thead><tr><th>Date</th><th>Caller</th><th>List</th><th>Script</th><th class="num">Calls</th><th class="num">Convos</th><th class="num">Interested</th><th class="num">Meetings</th><th class="num">Conn.</th><th class="num">Int.</th><th class="num">Book</th><th>What worked</th><th>What didn't</th><th></th></tr></thead>`;
+  if(!rows.length){ $('#logTable').innerHTML = head + '<tbody><tr><td colspan="14" class="empty">No sessions logged yet. Use the form above after your first shift.</td></tr></tbody>'; return; }
+  $('#logTable').innerHTML = head + '<tbody>' + rows.map(r=>`<tr data-id="${esc(r.id)}">
+    <td>${inp('date',toISOish(r.date),'date')}</td>
+    <td>${sel('caller',r.caller,callers.includes(r.caller)?callers:[...callers,r.caller])}</td>
+    <td>${sel('list',r.list,lists.includes(r.list)?lists:[...lists,r.list])}</td>
+    <td>${sel('script',r.script,scripts.includes(r.script)?scripts:[...scripts,r.script])}</td>
+    <td class="num">${inp('calls',r.calls,'number','num')}</td>
+    <td class="num">${inp('conversations',r.conversations,'number','num')}</td>
+    <td class="num">${inp('interested',r.interested,'number','num')}</td>
+    <td class="num">${inp('meetings',r.meetings,'number','num')}</td>
+    <td class="num muted">${fmtPct(pct(num(r.conversations),num(r.calls)))}</td>
+    <td class="num muted">${fmtPct(pct(num(r.interested),num(r.conversations)))}</td>
+    <td class="num muted">${fmtPct(pct(num(r.meetings),num(r.interested)))}</td>
+    <td>${ta('what_worked',r.what_worked)}</td><td>${ta('what_didnt',r.what_didnt)}</td>
+    <td><button class="btn danger sm" data-del="Call Log">Delete</button></td></tr>`).join('') +
+    `</tbody><tfoot><tr><td colspan="4">Totals</td><td class="num">${fmtN(t.calls)}</td><td class="num">${fmtN(t.conv)}</td><td class="num">${fmtN(t.int)}</td><td class="num">${fmtN(t.mtg)}</td><td class="num">${fmtPct(pct(t.conv,t.calls))}</td><td class="num">${fmtPct(pct(t.int,t.conv))}</td><td class="num">${fmtPct(pct(t.mtg,t.int))}</td><td colspan="3"></td></tr></tfoot>`;
+}
+
+// ---------- lists & weeks ----------
+function renderLists(){
+  const bl = byList(); const t = totals(S.callLog);
+  const lh = `<thead><tr><th>Prospect list</th><th class="num">Calls</th><th class="num">Conversations</th><th class="num">Interested</th><th class="num">Meetings</th><th class="num">Connection</th><th class="num">Interest</th><th class="num">Book</th><th class="num">Calls / meeting</th></tr></thead>`;
+  $('#listTable').innerHTML = lh + '<tbody>' + (bl.length ? bl.map(l=>`<tr><td>${esc(l.list)}</td><td class="num">${fmtN(l.calls)}</td><td class="num">${fmtN(l.conv)}</td><td class="num">${fmtN(l.int)}</td><td class="num">${fmtN(l.mtg)}</td><td class="num">${fmtPct(pct(l.conv,l.calls))}</td><td class="num">${fmtPct(pct(l.int,l.conv))}</td><td class="num">${fmtPct(pct(l.mtg,l.int))}</td><td class="num">${l.mtg?fmtN(l.calls/l.mtg):'—'}</td></tr>`).join('') : '<tr><td colspan="9" class="empty">No calls logged yet.</td></tr>') + '</tbody>' +
+    `<tfoot><tr><td>Totals</td><td class="num">${fmtN(t.calls)}</td><td class="num">${fmtN(t.conv)}</td><td class="num">${fmtN(t.int)}</td><td class="num">${fmtN(t.mtg)}</td><td class="num">${fmtPct(pct(t.conv,t.calls))}</td><td class="num">${fmtPct(pct(t.int,t.conv))}</td><td class="num">${fmtPct(pct(t.mtg,t.int))}</td><td class="num">${t.mtg?fmtN(t.calls/t.mtg):'—'}</td></tr></tfoot>`;
+  const wks = weekly(); let cum=0;
+  const notesBy = {}; S.callLog.forEach(r=>{const d=parseDate(r.date); if(!d) return; const k=iso(weekStart(d)); if(r.what_worked&&!/^n\/?a$/i.test(r.what_worked)) (notesBy[k]=notesBy[k]||[]).push(r.what_worked);});
+  const wh = `<thead><tr><th>Week of</th><th class="num">Calls</th><th class="num">Conversations</th><th class="num">Interested</th><th class="num">Meetings</th><th class="num">Connection</th><th class="num">Interest</th><th class="num">Book</th><th class="num">Cumulative meetings</th><th>Highlights</th></tr></thead>`;
+  $('#weekTable').innerHTML = wh + '<tbody>' + (wks.length ? wks.map(w=>{cum+=w.mtg; const n=(notesBy[iso(w.start)]||[])[0]||''; return `<tr><td>${esc(w.start.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}))}</td><td class="num">${fmtN(w.calls)}</td><td class="num">${fmtN(w.conv)}</td><td class="num">${fmtN(w.int)}</td><td class="num">${fmtN(w.mtg)}</td><td class="num">${fmtPct(pct(w.conv,w.calls))}</td><td class="num">${fmtPct(pct(w.int,w.conv))}</td><td class="num">${fmtPct(pct(w.mtg,w.int))}</td><td class="num">${cum}</td><td class="muted">${esc(n)}</td></tr>`;}).join('') : '<tr><td colspan="10" class="empty">No calls logged yet.</td></tr>') + '</tbody>';
+}
+
+// ---------- interactions ----------
+$('#tabs').addEventListener('click', e=>{ const b=e.target.closest('button[data-tab]'); if(b) go(b.dataset.tab); });
+document.addEventListener('click', e=>{ const a=e.target.closest('[data-goto]'); if(a){ e.preventDefault(); go(a.dataset.goto); if(a.dataset.goto==='meetings'){ $('#mtgFilter').value='needs'; renderMeetings(); } } });
+function go(tab){ $$('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); $$('main > section').forEach(s=>s.classList.toggle('hidden', s.dataset.view!==tab)); window.scrollTo({top:0}); }
+$('#refreshBtn').addEventListener('click', ()=>load());
+$('#mtgFilter').addEventListener('change', renderMeetings);
+
+// inline edits: save on change
+function bindTable(tableSel, sheet, listKey){
+  $(tableSel).addEventListener('change', async e=>{
+    const el = e.target.closest('[data-f]'); if(!el) return;
+    const tr = el.closest('[data-id]'); const id = tr.dataset.id; const f = el.dataset.f;
+    const row = S[listKey].find(r=>String(r.id)===String(id)); if(!row) return;
+    let v = el.value;
+    if(el.type==='number' && v!=='' && num(v)<0){ v='0'; el.value='0'; }
+    row[f] = v;
+    const ok = await saveRow(sheet, {id, [f]: v});
+    if(ok){ renderOverview(); renderLists(); if(listKey==='callLog' && ['calls','conversations','interested','meetings'].includes(f)) renderLog(); if(listKey==='meetings' && ['took_place','outcome','meeting_date','name','title','company','phone','email','list','caller','caller_notes','recording_link','booked_date'].includes(f) && !el.closest('details')) renderMeetings(); }
+  });
+  $(tableSel).addEventListener('click', async e=>{
+    const b = e.target.closest('[data-del]'); if(!b) return;
+    const tr = b.closest('[data-id]'); const id = tr.dataset.id;
+    if(!confirm('Delete this row? This can\'t be undone.')) return;
+    try{ await post({action:'delete', sheet, id}); S[listKey] = S[listKey].filter(r=>String(r.id)!==String(id)); render(); toast('Deleted'); }
+    catch(err){ toast('Delete failed', true); }
+  });
+}
+bindTable('#mtgTable','Booked Meetings','meetings');
+bindTable('#logTable','Call Log','callLog');
+
+// call log form
+const lf = $('#logForm');
+lf.date.value = todayISO();
+lf.addEventListener('submit', async e=>{
+  e.preventDefault();
+  const fd = Object.fromEntries(new FormData(lf).entries());
+  const c=num(fd.calls), cv=num(fd.conversations), i=num(fd.interested), m=num(fd.meetings);
+  if(cv>c) return toast('Conversations can\'t be more than calls', true);
+  if(i>cv) return toast('Interested can\'t be more than conversations', true);
+  if(m>i) return toast('Meetings can\'t be more than interested', true);
+  const btn=$('#logSubmit'); btn.disabled=true; btn.textContent='Saving…';
+  const row = Object.assign({}, fd);
+  if(await saveRow('Call Log', row)){ S.callLog.push(row); const keep={date:fd.date,caller:fd.caller,list:fd.list,script:fd.script}; lf.reset(); for(const k in keep) lf[k].value=keep[k]; ['conversations','interested','meetings'].forEach(k=>lf[k].value=0); render(); if(m>0) toast(`Saved ✓  Don't forget to add the ${m} meeting${m>1?'s':''} on the Booked Meetings tab`); }
+  btn.disabled=false; btn.textContent='Save session';
+});
+
+// meeting form
+const mf = $('#mtgForm');
+$('#addMtgBtn').addEventListener('click', ()=>{ $('#mtgFormCard').classList.remove('hidden'); mf.booked_date.value=todayISO(); mf.name.focus(); });
+mf.querySelector('[data-cancel]').addEventListener('click', ()=>{ mf.reset(); $('#mtgFormCard').classList.add('hidden'); });
+mf.addEventListener('submit', async e=>{
+  e.preventDefault();
+  const row = Object.fromEntries(new FormData(mf).entries()); row.status='Booked';
+  const b = mf.querySelector('button.btn:not(.ghost)'); b.disabled=true;
+  if(await saveRow('Booked Meetings', row)){ S.meetings.push(row); mf.reset(); $('#mtgFormCard').classList.add('hidden'); render(); }
+  b.disabled=false;
+});
+
+load();
+setInterval(()=>{ if(!pending && !document.hidden && !document.activeElement.matches('.cell, form.entry *')) load(true); }, 60000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && !pending) load(true); });
+})();
+</script>
+</body>
+</html>
