@@ -169,6 +169,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
     <nav class="tabs" id="tabs">
       <button data-tab="overview" class="on">Overview</button>
       <button data-tab="meetings">Booked Meetings <span class="badge hidden" id="pendingBadge">0</span></button>
+      <button data-tab="convos">Conversations <span class="badge hidden" id="convBadge" style="background:#0f766e">0</span></button>
       <button data-tab="calllog">Daily Call Log</button>
       <button data-tab="lists">Lists &amp; Weeks</button>
     </nav>
@@ -270,6 +271,22 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
   </section>
 
   <!-- CALL LOG -->
+  <section data-view="convos" class="hidden">
+    <div class="hero"><div><h1>Conversations</h1><p>Every decision maker we actually spoke with. Gatekeepers, voicemails and no-answers are left out.</p></div></div>
+    <div class="toolbar">
+      <select class="cell" id="convFilter" style="max-width:220px;border-color:var(--line);background:#fff">
+        <option value="all">All outcomes</option>
+        <option value="Meeting Booked">Meeting booked</option>
+        <option value="Positive">Positive</option>
+        <option value="Neutral">Neutral</option>
+        <option value="Negative">Negative</option>
+      </select>
+      <div class="grow"></div>
+      <span class="muted" id="convCount"></span>
+    </div>
+    <div class="mlist" id="convList"></div>
+  </section>
+
   <section data-view="calllog" class="hidden">
     <div class="hero">
       <div><h1>Daily Call Log</h1><p>Callers: log each session at the end of your shift. One row per list per day.</p></div>
@@ -317,7 +334,7 @@ const API = 'https://script.google.com/macros/s/' + key + '/exec';
 document.getElementById('app').classList.remove('hidden');
 
 // ---------- state ----------
-let S = { callLog: [], meetings: [], settings: {} };
+let S = { callLog: [], meetings: [], conversations: [], settings: {} };
 const $ = (s, el=document) => el.querySelector(s);
 const $$ = (s, el=document) => [...el.querySelectorAll(s)];
 const num = v => { const n = parseFloat(String(v||'').replace(/[$,]/g,'')); return isFinite(n) ? n : 0; };
@@ -346,7 +363,7 @@ async function load(silent){
     const r = await fetch(API, {cache:'no-store'});
     const j = await r.json();
     if(!j.ok) throw new Error(j.error||'Load failed');
-    S = { callLog: j.callLog||[], meetings: j.meetings||[], settings: j.settings||{} };
+    S = { callLog: j.callLog||[], meetings: j.meetings||[], conversations: j.conversations||[], settings: j.settings||{} };
     render();
     status('ok', 'Updated ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}));
   }catch(e){ status('err','Offline — retrying'); console.error(e); if(!silent) toast('Could not load data. Retrying…', true); }
@@ -384,7 +401,7 @@ function render(){
   $('#heroSub').textContent = `Live results from Upwind's calling team, booking meetings for ${closer}.`;
   $$('.closerFirst').forEach(e=>e.textContent=(S.settings.closer||'Client').split(' ')[0]);
   fillSelects();
-  renderOverview(); renderMeetings(); renderLog(); renderLists();
+  renderOverview(); renderMeetings(); renderConvos(); renderLog(); renderLists();
 }
 
 function fillSelects(){
@@ -566,6 +583,21 @@ function renderLog(){
 }
 
 // ---------- lists & weeks ----------
+function dispPill(d){ const v=String(d||''); const c=/meeting|positive/i.test(v)?'good':/negative/i.test(v)?'bad':'warn'; return v?`<span class="pill ${c}">${esc(v)}</span>`:''; }
+function renderConvos(){
+  const f=$('#convFilter').value;
+  const all=[...S.conversations].sort((a,b)=>(parseDate(b.date)||0)-(parseDate(a.date)||0));
+  const rows = f==='all' ? all : all.filter(c=>String(c.disposition||'').toLowerCase()===f.toLowerCase());
+  $('#convBadge').textContent=all.length; $('#convBadge').classList.toggle('hidden',!all.length);
+  $('#convCount').textContent = `${rows.length} conversation${rows.length===1?'':'s'}`;
+  if(!rows.length){ $('#convList').innerHTML=`<div class="card empty">${all.length?'No conversations match this filter.':'Conversations with decision makers will appear here after each calling session.'}</div>`; return; }
+  $('#convList').innerHTML = rows.map(c=>{ const li=/^https:\/\/(www\.)?linkedin\.com\//i.test(c.linkedin||'')?c.linkedin:''; const rec=/^https:\/\/app\.apollo\.io\//.test(c.recording_link||'')?c.recording_link:'';
+    return `<div class="card">
+      <div class="who" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px"><b style="font-size:16px">${esc(c.name||'Unknown')}</b><span class="muted">${esc([c.title,c.company].filter(Boolean).join(' · '))}</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px;align-items:center">${dispPill(c.disposition)}<span class="pill">📅 ${esc(nice(parseDate(c.date)))}</span>${c.caller?`<span class="pill">Called by ${esc(c.caller)}</span>`:''}${c.list?`<span class="pill">${esc(shortList(c.list))}</span>`:''}${li?`<a class="pill blue" href="${esc(li)}" target="_blank" rel="noopener noreferrer">LinkedIn ↗</a>`:''}${rec?`<a class="pill" href="${esc(rec)}" target="_blank" rel="noopener noreferrer">Call recording ↗</a>`:''}</div>
+      ${c.summary?`<div class="cnotes" style="background:#f8fafc;border-radius:10px;padding:10px 12px;font-size:13px">${esc(c.summary)}</div>`:''}
+    </div>`; }).join('');
+}
 function renderLists(){
   const bl = byList(); const t = totals(S.callLog);
   const lh = `<thead><tr><th>Prospect list</th><th class="num">Calls</th><th class="num">Conversations</th><th class="num">Interested</th><th class="num">Meetings</th><th class="num">Connection</th><th class="num">Interest</th><th class="num">Book</th><th class="num">Calls / meeting</th></tr></thead>`;
@@ -583,6 +615,7 @@ document.addEventListener('click', e=>{ const a=e.target.closest('[data-goto]');
 function go(tab){ $$('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab)); $$('main > section').forEach(s=>s.classList.toggle('hidden', s.dataset.view!==tab)); window.scrollTo({top:0}); }
 $('#refreshBtn').addEventListener('click', ()=>load());
 $('#mtgFilter').addEventListener('change', renderMeetings);
+$('#convFilter').addEventListener('change', renderConvos);
 
 // inline edits: save on change
 function bindTable(tableSel, sheet, listKey){
