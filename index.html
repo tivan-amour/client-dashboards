@@ -377,6 +377,7 @@ function render(){
   const lg = $('#clientLogo'), logoUrl = String(S.settings.client_logo||'').trim();
   if (/^https:\/\//.test(logoUrl)) {
     if (lg.getAttribute('src') !== logoUrl) { lg.onload = () => { lg.classList.remove('hidden'); $('#clientName').classList.add('hidden'); }; lg.onerror = () => { lg.classList.add('hidden'); $('#clientName').classList.remove('hidden'); }; lg.alt = client; lg.src = logoUrl; }
+    lg.style.filter = /^(yes|true|dark)$/i.test(String(S.settings.client_logo_dark||'')) ? 'brightness(0)' : '';
   } else { lg.classList.add('hidden'); $('#clientName').classList.remove('hidden'); }
   document.title = 'Upwind × ' + client + ' · Outreach Dashboard';
   const closer = S.settings.closer || 'your team';
