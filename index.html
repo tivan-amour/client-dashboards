@@ -111,6 +111,12 @@ form.entry .actions{grid-column:1/-1;display:flex;gap:10px;justify-content:flex-
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.err{background:#b91c1c}
 .hidden{display:none!important}
+.rate{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;font-weight:800;font-size:15px;flex:none}
+.rate.A{background:#dcfce7;color:#15803d}.rate.B{background:#dbeafe;color:#1d4ed8}.rate.C{background:#fef3c7;color:#b45309}.rate.none{background:var(--soft);color:var(--muted)}
+.ratesum{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.ratesum .card{display:flex;gap:12px;align-items:center;cursor:pointer}
+.ratesum .card.on{border-color:var(--ink);box-shadow:0 0 0 2px rgba(15,23,42,.08)}
+.ratesum b{font-size:22px;display:block;line-height:1.1}
 .legend-key{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-right:12px}
 .legend-key i{width:12px;height:12px;border-radius:3px;display:inline-block}
 footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
@@ -168,7 +174,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
     </div>
     <nav class="tabs" id="tabs">
       <button data-tab="overview" class="on">Overview</button>
-      <button data-tab="meetings">Booked Meetings <span class="badge hidden" id="pendingBadge">0</span></button>
+      <button data-tab="meetings"><span id="mtgTabLbl">Booked Meetings</span> <span class="badge hidden" id="pendingBadge">0</span></button>
       <button data-tab="convos">Conversations <span class="badge hidden" id="convBadge" style="background:#0f766e">0</span></button>
       <button data-tab="calllog">Daily Call Log</button>
       <button data-tab="lists">Lists &amp; Weeks</button>
@@ -215,9 +221,9 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
 
     <div class="grid two section">
       <div class="card"><h2>Calls per month</h2><div class="chartbox"><canvas id="chMonthly"></canvas></div></div>
-      <div class="card"><h2>Cumulative meetings booked</h2><div class="chartbox"><canvas id="chCum"></canvas></div></div>
+      <div class="card"><h2 id="hCum">Cumulative meetings booked</h2><div class="chartbox"><canvas id="chCum"></canvas></div></div>
       <div class="card"><h2>Weekly conversion rates</h2><div class="chartbox"><canvas id="chWeekly"></canvas></div></div>
-      <div class="card"><h2>Meetings booked by list</h2><div class="chartbox"><canvas id="chByList"></canvas></div></div>
+      <div class="card"><h2 id="hByList">Meetings booked by list</h2><div class="chartbox"><canvas id="chByList"></canvas></div></div>
     </div>
 
     <div class="grid two section">
@@ -229,6 +235,11 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
         <h2>From the phones <small>what our callers are hearing</small></h2>
         <div class="notes" id="feed"></div>
       </div>
+    </div>
+
+    <div class="grid two section hidden" id="dialSection">
+      <div class="card"><h2>Connect rate by number type <small>from Dialpad</small></h2><div class="chartbox"><canvas id="chPhoneType"></canvas></div></div>
+      <div class="card"><h2>Calls and conversations by hour <small>local time of the call</small></h2><div class="chartbox"><canvas id="chHour"></canvas></div></div>
     </div>
   </section>
 
@@ -284,6 +295,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
       <div class="grow"></div>
       <span class="muted" id="convCount"></span>
     </div>
+    <div class="ratesum hidden" id="rateSum"></div>
     <div class="mlist" id="convList"></div>
   </section>
 
@@ -334,7 +346,7 @@ const API = 'https://script.google.com/macros/s/' + key + '/exec';
 document.getElementById('app').classList.remove('hidden');
 
 // ---------- state ----------
-let S = { callLog: [], meetings: [], conversations: [], settings: {} };
+let S = { callLog: [], meetings: [], conversations: [], dialpadCalls: [], settings: {} };
 const $ = (s, el=document) => el.querySelector(s);
 const $$ = (s, el=document) => [...el.querySelectorAll(s)];
 const num = v => { const n = parseFloat(String(v||'').replace(/[$,]/g,'')); return isFinite(n) ? n : 0; };
@@ -349,6 +361,8 @@ const iso = d => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0'
 const nice = d => d ? d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '';
 function weekStart(d){ const x=new Date(d); const wd=(x.getDay()+6)%7; x.setDate(x.getDate()-wd); x.setHours(0,0,0,0); return x; }
 const opts = k => String(S.settings[k]||'').split(';').map(s=>s.trim()).filter(Boolean);
+const L = (k, d) => String(S.settings[k]||'').trim() || d;
+const ratings = () => opts('ratings').map(x=>{ const [code,...rest]=x.split('|'); return {code:code.trim().toUpperCase(), label:rest.join('|').trim()}; }).filter(r=>r.code);
 
 const TOOK = ['', 'Yes, it happened', 'No-show', 'Rescheduled', 'Cancelled'];
 const OUTCOME = ['', 'Good fit, next steps', 'Proposal / quote sent', 'Closed, won', 'Not a fit', 'Bad timing, revisit later', 'Wrong person'];
@@ -363,7 +377,7 @@ async function load(silent){
     const r = await fetch(API, {cache:'no-store'});
     const j = await r.json();
     if(!j.ok) throw new Error(j.error||'Load failed');
-    S = { callLog: j.callLog||[], meetings: j.meetings||[], conversations: j.conversations||[], settings: j.settings||{} };
+    S = { callLog: j.callLog||[], meetings: j.meetings||[], conversations: j.conversations||[], dialpadCalls: j.dialpadCalls||[], settings: j.settings||{} };
     render();
     status('ok', 'Updated ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}));
   }catch(e){ status('err','Offline — retrying'); console.error(e); if(!silent) toast('Could not load data. Retrying…', true); }
@@ -398,8 +412,10 @@ function render(){
   } else { lg.classList.add('hidden'); $('#clientName').classList.remove('hidden'); }
   document.title = 'Upwind × ' + client + ' · Outreach Dashboard';
   const closer = S.settings.closer || 'your team';
-  $('#heroSub').textContent = `Live results from Upwind's calling team, booking meetings for ${closer}.`;
+  $('#heroSub').textContent = L('hero_sub', `Live results from Upwind's calling team, booking meetings for ${closer}.`);
+  $('#hCum').textContent = 'Cumulative ' + L('label_meetings','meetings booked').replace(/^./,c=>c.toLowerCase()); $('#hByList').textContent = L('label_meetings','Meetings booked') + ' by list';
   $$('.closerFirst').forEach(e=>e.textContent=(S.settings.closer||'Client').split(' ')[0]);
+  $('#mtgTabLbl').textContent = L('meetings_tab_label','Booked Meetings');
   fillSelects();
   renderOverview(); renderMeetings(); renderConvos(); renderLog(); renderLists();
 }
@@ -423,11 +439,11 @@ function renderOverview(){
   const kp = [
     ['Total calls', fmtN(t.calls), 'dials made'],
     ['Conversations', fmtN(t.conv), 'decision makers reached'],
-    ['Interested', fmtN(t.int), 'wanted to hear more'],
-    ['Meetings booked', fmtN(mtgCount), 'on ' + (S.settings.closer||'the') + "'s calendar", true],
+    [L('label_interested','Interested'), fmtN(t.int), L('label_interested_sub','wanted to hear more')],
+    [L('label_meetings','Meetings booked'), fmtN(mtgCount), L('label_meetings_sub','on ' + (S.settings.closer||'the') + "'s calendar"), true],
     ['Connection rate', fmtPct(pct(t.conv,t.calls)), 'conversations ÷ calls'],
-    ['Interest rate', fmtPct(pct(t.int,t.conv)), 'interested ÷ conversations'],
-    ['Book rate', fmtPct(pct(t.mtg,t.int)), 'meetings ÷ interested'],
+    [L('label_interest_rate','Interest rate'), fmtPct(pct(t.int,t.conv)), L('label_interested','interested').toLowerCase() + ' ÷ conversations'],
+    [L('label_book_rate','Book rate'), fmtPct(ratings().length ? pct(t.mtg,t.conv) : pct(t.mtg,t.int)), ratings().length ? L('label_meetings','meetings').toLowerCase() + ' ÷ conversations' : 'meetings ÷ interested'],
   ];
   $('#kpis').innerHTML = kp.map(k=>`<div class="card kpi${k[3]?' hl':''}"><div class="label">${k[0]}</div><div class="val">${k[1]}</div><div class="sub">${esc(k[2])}</div></div>`).join('');
 
@@ -447,7 +463,7 @@ function renderOverview(){
   $('#weekLbl').textContent = 'since ' + nice(ws);
   $('#weekNow').textContent = fmtN(wk.calls); $('#weekOf').textContent = `of ~${wt} target`;
   $('#weekBar').style.width = Math.min(100, wk.calls/wt*100) + '%';
-  $('#weekConv').textContent = `${wk.conv} conversations`; $('#weekMtg').textContent = `${wk.mtg} meetings`;
+  $('#weekConv').textContent = `${wk.conv} conversations`; $('#weekMtg').textContent = `${wk.mtg} ${ratings().length ? L('label_meetings','meetings') : 'meetings'}`;
 
   // meeting results
   const today = new Date(); today.setHours(0,0,0,0);
@@ -475,7 +491,7 @@ function renderOverview(){
   chart('chMonthly',{type:'bar',data:{labels:Object.keys(byMonth),datasets:[{label:'Calls',data:Object.values(byMonth),backgroundColor:'#0f172a',borderRadius:6,maxBarThickness:46}]},options:baseOpts()});
   // cumulative meetings by date
   let c=0; const cumL=[], cumD=[]; log.forEach(r=>{c+=num(r.meetings); cumL.push(nice(parseDate(r.date))); cumD.push(c);});
-  chart('chCum',{type:'line',data:{labels:cumL,datasets:[{label:'Meetings',data:cumD,borderColor:'#0f766e',backgroundColor:'rgba(15,118,110,.12)',fill:true,tension:.3,pointRadius:2}]},options:baseOpts()});
+  chart('chCum',{type:'line',data:{labels:cumL,datasets:[{label:L('label_meetings','Meetings'),data:cumD,borderColor:'#0f766e',backgroundColor:'rgba(15,118,110,.12)',fill:true,tension:.3,pointRadius:2}]},options:baseOpts()});
   // weekly rates
   const wks = weekly();
   chart('chWeekly',{type:'line',data:{labels:wks.map(w=>nice(w.start)),datasets:[
@@ -485,15 +501,28 @@ function renderOverview(){
     options:Object.assign(baseOpts(true),{scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}})});
   // by list
   const bl = byList();
-  chart('chByList',{type:'bar',data:{labels:bl.map(l=>shortList(l.list)),datasets:[{label:'Meetings',data:bl.map(l=>l.mtg),backgroundColor:'#0f766e',borderRadius:6,maxBarThickness:46},{label:'Conversations',data:bl.map(l=>l.conv),backgroundColor:'#cbd5e1',borderRadius:6,maxBarThickness:46}]},options:baseOpts(true)});
+  chart('chByList',{type:'bar',data:{labels:bl.map(l=>shortList(l.list)),datasets:[{label:L('label_meetings','Meetings'),data:bl.map(l=>l.mtg),backgroundColor:'#0f766e',borderRadius:6,maxBarThickness:46},{label:'Conversations',data:bl.map(l=>l.conv),backgroundColor:'#cbd5e1',borderRadius:6,maxBarThickness:46}]},options:baseOpts(true)});
 
   // funnel
-  const st=[['Calls made',t.calls],['Conversations',t.conv],['Interested',t.int],['Meetings',t.mtg]];
+  const st=[['Calls made',t.calls],['Conversations',t.conv],[L('label_interested','Interested'),t.int],[L('label_meetings','Meetings'),t.mtg]];
   $('#funnel').innerHTML = st.map((s,i)=>`<div class="stage"><div>${s[0]}</div><div class="bar"><i style="width:${t.calls?Math.max(1,s[1]/t.calls*100):0}%"></i></div><div class="n">${fmtN(s[1])}</div><div class="p">${i?fmtPct(pct(s[1],st[i-1][1]))+' of prior':'100%'}</div></div>`).join('');
 
   // feed
-  const notes=[]; [...log].reverse().forEach(r=>{ if(r.what_worked&&!/^n\/?a$/i.test(r.what_worked)) notes.push({d:r.date,t:r.what_worked,pos:true,l:r.list}); if(r.what_didnt&&!/^n\/?a$/i.test(r.what_didnt)) notes.push({d:r.date,t:r.what_didnt,pos:false,l:r.list}); });
-  $('#feed').innerHTML = notes.length ? notes.slice(0,6).map(n=>`<div class="note ${n.pos?'':'neg'}"><div class="h">${esc(nice(parseDate(n.d)))} · ${n.pos?'What worked':'What we learned'}${n.l?' · '+esc(shortList(n.l)):''}</div>${esc(n.t)}</div>`).join('') : '<div class="empty">Callers\' notes from each session will show up here.</div>';
+  const notes=[];
+  if(ratings().length){ [...S.conversations].sort((a,b)=>String(b.date+' '+b.time).localeCompare(String(a.date+' '+a.time))).forEach(c=>{ if(c.summary) notes.push({d:c.date,t:`${String(c.rating||'').toUpperCase()?String(c.rating).toUpperCase()+' · ':''}${c.company?c.company+': ':''}${c.summary}`,pos:/^[AB]$/i.test(c.rating||''),l:c.list}); }); }
+  [...log].reverse().forEach(r=>{ if(r.what_worked&&!/^n\/?a$/i.test(r.what_worked)) notes.push({d:r.date,t:r.what_worked,pos:true,l:r.list}); if(r.what_didnt&&!/^n\/?a$/i.test(r.what_didnt)) notes.push({d:r.date,t:r.what_didnt,pos:false,l:r.list}); });
+  $('#feed').innerHTML = notes.length ? notes.slice(0,6).map(n=>`<div class="note ${n.pos?'':'neg'}"><div class="h">${esc(nice(parseDate(n.d)))} · ${ratings().length?'From a conversation':(n.pos?'What worked':'What we learned')}${n.l?' · '+esc(shortList(n.l)):''}</div>${esc(n.t)}</div>`).join('') : '<div class="empty">Callers\' notes from each session will show up here.</div>';
+  renderDialpad();
+}
+function renderDialpad(){
+  const dc = S.dialpadCalls||[]; $('#dialSection').classList.toggle('hidden', !dc.length); if(!dc.length) return;
+  const byConv = {}; S.conversations.forEach(c=>{ if(c.dialpad_call_id) byConv[c.dialpad_call_id]=1; });
+  const types = {}; dc.forEach(c=>{ const k=c.phone_type||'Unmatched'; (types[k]=types[k]||{n:0,conn:0}); types[k].n++; if(c.connected==='yes') types[k].conn++; });
+  const tk = Object.keys(types).sort((a,b)=>types[b].n-types[a].n);
+  chart('chPhoneType',{type:'bar',data:{labels:tk.map(k=>`${k} (${types[k].n})`),datasets:[{label:'Connect rate',data:tk.map(k=>pct(types[k].conn,types[k].n)),backgroundColor:'#2563eb',borderRadius:6,maxBarThickness:46}]},options:Object.assign(baseOpts(),{scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}})});
+  const hrs = {}; dc.forEach(c=>{ const h=parseInt(String(c.time||'').split(':')[0],10); if(isNaN(h)) return; (hrs[h]=hrs[h]||{n:0,conv:0}); hrs[h].n++; if(c.connected==='yes') hrs[h].conv++; });
+  const hk = Object.keys(hrs).map(Number).sort((a,b)=>a-b); const hl = h=> (h%12||12)+(h<12?'a':'p');
+  chart('chHour',{type:'bar',data:{labels:hk.map(hl),datasets:[{label:'Calls',data:hk.map(h=>hrs[h].n),backgroundColor:'#cbd5e1',borderRadius:6,maxBarThickness:40},{label:'Connected',data:hk.map(h=>hrs[h].conv),backgroundColor:'#0f766e',borderRadius:6,maxBarThickness:40}]},options:baseOpts(true)});
 }
 function baseOpts(legend){ return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:!!legend,position:'bottom'}},scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'},ticks:{precision:0}},x:{grid:{display:false}}}}; }
 const shortList = l => String(l||'').replace(/^.*?\|\s*/,'').replace(/\s*\|\s*HQ$/,'') || l;
@@ -584,20 +613,53 @@ function renderLog(){
 
 // ---------- lists & weeks ----------
 function dispPill(d){ const v=String(d||''); const c=/meeting|positive/i.test(v)?'good':/negative/i.test(v)?'bad':'warn'; return v?`<span class="pill ${c}">${esc(v)}</span>`:''; }
+const RATE_ORDER = {A:0,B:1,C:2};
+const fmtPhone = p => { const d=String(p||'').replace(/\D/g,'').replace(/^1(?=\d{10}$)/,''); return d.length===10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : String(p||''); };
 function renderConvos(){
-  const f=$('#convFilter').value;
-  const all=[...S.conversations].sort((a,b)=>(parseDate(b.date)||0)-(parseDate(a.date)||0));
-  const rows = f==='all' ? all : all.filter(c=>String(c.disposition||'').toLowerCase()===f.toLowerCase());
+  const rs = ratings(), rated = rs.length>0;
+  const fsel = $('#convFilter');
+  const want = rated ? ['all',...rs.map(r=>r.code),'unrated'] : ['all','Meeting Booked','Positive','Neutral','Negative'];
+  if(fsel.dataset.mode !== (rated?'r':'d')){
+    fsel.innerHTML = rated ? `<option value="all">All ratings</option>${rs.map(r=>`<option value="${esc(r.code)}">${esc(r.code)} · ${esc(r.label)}</option>`).join('')}<option value="unrated">Not rated yet</option>`
+      : '<option value="all">All outcomes</option><option value="Meeting Booked">Meeting booked</option><option value="Positive">Positive</option><option value="Neutral">Neutral</option><option value="Negative">Negative</option>';
+    fsel.dataset.mode = rated?'r':'d';
+  }
+  const f=fsel.value;
+  const all=[...S.conversations].sort((a,b)=>((parseDate(b.date)||0)-(parseDate(a.date)||0)) || String(b.time||'').localeCompare(String(a.time||'')));
+  let rows;
+  if(f==='all') rows=all;
+  else if(rated) rows = f==='unrated' ? all.filter(c=>!rs.some(r=>r.code===String(c.rating||'').toUpperCase())) : all.filter(c=>String(c.rating||'').toUpperCase()===f);
+  else rows = all.filter(c=>String(c.disposition||'').toLowerCase()===f.toLowerCase());
   $('#convBadge').textContent=all.length; $('#convBadge').classList.toggle('hidden',!all.length);
   $('#convCount').textContent = `${rows.length} conversation${rows.length===1?'':'s'}`;
+  const sum=$('#rateSum'); sum.classList.toggle('hidden', !rated);
+  if(rated){
+    sum.innerHTML = rs.map(r=>{ const n=all.filter(c=>String(c.rating||'').toUpperCase()===r.code).length; return `<div class="card${f===r.code?' on':''}" data-rate="${esc(r.code)}"><span class="rate ${esc(r.code)}">${esc(r.code)}</span><div><b>${n}</b><span class="muted">${esc(r.label)}</span></div></div>`; }).join('');
+  }
   if(!rows.length){ $('#convList').innerHTML=`<div class="card empty">${all.length?'No conversations match this filter.':'Conversations with decision makers will appear here after each calling session.'}</div>`; return; }
-  $('#convList').innerHTML = rows.map(c=>{ const li=/^https:\/\/(www\.)?linkedin\.com\//i.test(c.linkedin||'')?c.linkedin:''; const rec=/^https:\/\/app\.apollo\.io\//.test(c.recording_link||'')?c.recording_link:'';
-    return `<div class="card">
+  const rateOpts = ['', ...rs.map(r=>r.code)];
+  $('#convList').innerHTML = rows.map(c=>{ const li=/^https:\/\/(www\.)?linkedin\.com\//i.test(c.linkedin||'')?c.linkedin:''; const rec=/^https:\/\/(app\.apollo\.io|dialpad\.com|[a-z0-9-]+\.dialpad\.com)\//i.test(c.recording_link||'')?c.recording_link:'';
+    const code=String(c.rating||'').toUpperCase(); const rl=(rs.find(r=>r.code===code)||{}).label;
+    return `<div class="card" data-id="${esc(c.id)}">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+      ${rated?`<span class="rate ${RATE_ORDER[code]!=null?esc(code):'none'}" title="${esc(rl||'Not rated')}">${esc(code||'–')}</span>`:''}
+      <div style="flex:1;min-width:0">
       <div class="who" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px"><b style="font-size:16px">${esc(c.name||'Unknown')}</b><span class="muted">${esc([c.title,c.company].filter(Boolean).join(' · '))}</span></div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px;align-items:center">${dispPill(c.disposition)}<span class="pill">📅 ${esc(nice(parseDate(c.date)))}</span>${c.caller?`<span class="pill">Called by ${esc(c.caller)}</span>`:''}${c.list?`<span class="pill">${esc(shortList(c.list))}</span>`:''}${li?`<a class="pill blue" href="${esc(li)}" target="_blank" rel="noopener noreferrer">LinkedIn ↗</a>`:''}${rec?`<a class="pill" href="${esc(rec)}" target="_blank" rel="noopener noreferrer">Call recording ↗</a>`:''}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px;align-items:center">${rated&&rl?`<span class="pill ${code==='A'?'good':code==='B'?'blue':'warn'}">${esc(rl)}</span>`:dispPill(c.disposition)}<span class="pill">📅 ${esc(nice(parseDate(c.date)))}${c.time?' · '+esc(c.time):''}</span>${c.caller?`<span class="pill">Called by ${esc(c.caller)}</span>`:''}${c.list?`<span class="pill">${esc(shortList(c.list))}</span>`:''}${c.category?`<span class="pill">${esc(c.category)}</span>`:''}${li?`<a class="pill blue" href="${esc(li)}" target="_blank" rel="noopener noreferrer">LinkedIn ↗</a>`:''}${rec?`<a class="pill" href="${esc(rec)}" target="_blank" rel="noopener noreferrer">Call recording ↗</a>`:''}</div>
+      ${(c.phone||c.email)?`<div class="muted" style="font-size:13px;margin-bottom:8px">${c.phone?`<a href="tel:${esc(c.phone)}">${esc(fmtPhone(c.phone))}</a>`:''}${c.phone&&c.email?' · ':''}${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}</div>`:''}
       ${c.summary?`<div class="cnotes" style="background:#f8fafc;border-radius:10px;padding:10px 12px;font-size:13px">${esc(c.summary)}</div>`:''}
+      ${c.referrals?`<div class="cnotes" style="background:#eff6ff;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:8px"><b>Referrals:</b> ${esc(c.referrals)}</div>`:''}
+      ${c.follow_up?`<div class="cnotes" style="background:#fffbeb;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:8px"><b>Follow-up:</b> ${esc(c.follow_up)}</div>`:''}
+      ${rated?`<details style="margin-top:10px"><summary class="muted" style="cursor:pointer;font-size:12px;font-weight:600">Change rating (Upwind)</summary><div style="margin-top:8px;max-width:260px"><select class="cell" data-rate-set style="border-color:var(--line)">${rateOpts.map(o=>`<option value="${esc(o)}"${o===code?' selected':''}>${o?esc(o+' · '+(rs.find(r=>r.code===o)||{}).label):'Not rated'}</option>`).join('')}</select></div></details>`:''}
+      </div></div>
     </div>`; }).join('');
 }
+$('#rateSum').addEventListener('click', e=>{ const c=e.target.closest('[data-rate]'); if(!c) return; const v=c.dataset.rate; $('#convFilter').value = $('#convFilter').value===v ? 'all' : v; renderConvos(); });
+$('#convList').addEventListener('change', async e=>{
+  const el=e.target.closest('[data-rate-set]'); if(!el) return;
+  const id=el.closest('[data-id]').dataset.id; const row=S.conversations.find(r=>String(r.id)===String(id)); if(!row) return;
+  row.rating=el.value; if(await saveRow('Conversations',{id, rating:el.value})) load(true);
+});
 function renderLists(){
   const bl = byList(); const t = totals(S.callLog);
   const lh = `<thead><tr><th>Prospect list</th><th class="num">Calls</th><th class="num">Conversations</th><th class="num">Interested</th><th class="num">Meetings</th><th class="num">Connection</th><th class="num">Interest</th><th class="num">Book</th><th class="num">Calls / meeting</th></tr></thead>`;
