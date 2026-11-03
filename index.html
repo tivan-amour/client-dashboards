@@ -43,6 +43,7 @@ main{padding:22px 0 60px}
 .hero .meta{margin-left:auto;color:var(--muted);font-size:12px;text-align:right}
 .grid{display:grid;gap:14px}
 .kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.kpis.rated{grid-template-columns:repeat(3,minmax(0,1fr))}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;min-width:0}
 .kpi .label{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
 .kpi .val{font-size:28px;font-weight:800;letter-spacing:-.02em;margin-top:6px}
@@ -362,7 +363,8 @@ const nice = d => d ? d.toLocaleDateString(undefined,{month:'short',day:'numeric
 function weekStart(d){ const x=new Date(d); const wd=(x.getDay()+6)%7; x.setDate(x.getDate()-wd); x.setHours(0,0,0,0); return x; }
 const opts = k => String(S.settings[k]||'').split(';').map(s=>s.trim()).filter(Boolean);
 const L = (k, d) => String(S.settings[k]||'').trim() || d;
-const ratings = () => opts('ratings').map(x=>{ const [code,...rest]=x.split('|'); return {code:code.trim().toUpperCase(), label:rest.join('|').trim()}; }).filter(r=>r.code);
+const ratings = () => opts('ratings').map(x=>{ const [code,label,rate]=x.split('|'); return {code:String(code||'').trim().toUpperCase(), label:String(label||'').trim(), rate:String(rate||'').trim()}; }).filter(r=>r.code);
+const RATE_COLORS = {A:'#15803d',B:'#2563eb',C:'#d97706'};
 
 const TOOK = ['', 'Yes, it happened', 'No-show', 'Rescheduled', 'Cancelled'];
 const OUTCOME = ['', 'Good fit, next steps', 'Proposal / quote sent', 'Closed, won', 'Not a fit', 'Bad timing, revisit later', 'Wrong person'];
@@ -503,6 +505,8 @@ function renderOverview(){
   const bl = byList();
   chart('chByList',{type:'bar',data:{labels:bl.map(l=>shortList(l.list)),datasets:[{label:L('label_meetings','Meetings'),data:bl.map(l=>l.mtg),backgroundColor:'#0f766e',borderRadius:6,maxBarThickness:46},{label:'Conversations',data:bl.map(l=>l.conv),backgroundColor:'#cbd5e1',borderRadius:6,maxBarThickness:46}]},options:baseOpts(true)});
 
+  if(ratings().length) renderRatedOverview(log, t);
+
   // funnel
   const st=[['Calls made',t.calls],['Conversations',t.conv],[L('label_interested','Interested'),t.int],[L('label_meetings','Meetings'),t.mtg]];
   $('#funnel').innerHTML = st.map((s,i)=>`<div class="stage"><div>${s[0]}</div><div class="bar"><i style="width:${t.calls?Math.max(1,s[1]/t.calls*100):0}%"></i></div><div class="n">${fmtN(s[1])}</div><div class="p">${i?fmtPct(pct(s[1],st[i-1][1]))+' of prior':'100%'}</div></div>`).join('');
@@ -523,6 +527,29 @@ function renderDialpad(){
   const hrs = {}; dc.forEach(c=>{ const h=parseInt(String(c.time||'').split(':')[0],10); if(isNaN(h)) return; (hrs[h]=hrs[h]||{n:0,conv:0}); hrs[h].n++; if(c.connected==='yes') hrs[h].conv++; });
   const hk = Object.keys(hrs).map(Number).sort((a,b)=>a-b); const hl = h=> (h%12||12)+(h<12?'a':'p');
   chart('chHour',{type:'bar',data:{labels:hk.map(hl),datasets:[{label:'Calls',data:hk.map(h=>hrs[h].n),backgroundColor:'#cbd5e1',borderRadius:6,maxBarThickness:40},{label:'Connected',data:hk.map(h=>hrs[h].conv),backgroundColor:'#0f766e',borderRadius:6,maxBarThickness:40}]},options:baseOpts(true)});
+}
+function renderRatedOverview(log, t){
+  const RS = ratings(), col = r => RATE_COLORS[r.code] || '#64748b';
+  const cv = S.conversations.filter(c=>parseDate(c.date));
+  const code = c => String(c.rating||'').toUpperCase();
+  const cnt = k => cv.filter(c=>code(c)===k).length;
+  const tiles = [['Total calls', fmtN(t.calls), 'dials made'], ['Conversations', fmtN(t.conv), 'target contacts reached'], ['Connection rate', fmtPct(pct(t.conv,t.calls)), 'conversations ÷ calls']];
+  RS.forEach(r=>tiles.push([`${r.code} leads`, fmtN(cnt(r.code)), r.label, r.code==='A']));
+  RS.forEach(r=>tiles.push([r.rate || (r.label+' rate'), fmtPct(pct(cnt(r.code), t.conv)), `${r.code} leads ÷ conversations`]));
+  $('#kpis').classList.add('rated');
+  $('#kpis').innerHTML = tiles.map(k=>`<div class="card kpi${k[3]?' hl':''}"><div class="label">${esc(k[0])}</div><div class="val">${k[1]}</div><div class="sub">${esc(k[2])}</div></div>`).join('');
+  // cumulative A/B/C by calling day
+  const days = [...new Set(log.map(r=>iso(parseDate(r.date))).concat(cv.map(c=>iso(parseDate(c.date)))))].filter(Boolean).sort();
+  $('#hCum').textContent = 'Cumulative ' + RS.map(r=>r.code).join(' / ') + ' leads';
+  chart('chCum',{type:'line',data:{labels:days.map(d=>nice(parseDate(d))),datasets:RS.map(r=>{ let n=0; return {label:`${r.code} · ${r.label}`, data:days.map(d=>{ n+=cv.filter(c=>code(c)===r.code && iso(parseDate(c.date))===d).length; return n; }), borderColor:col(r), backgroundColor:col(r), tension:.3, pointRadius:3}; })},options:baseOpts(true)});
+  // weekly rates per rating
+  const wks = weekly();
+  chart('chWeekly',{type:'line',data:{labels:wks.map(w=>nice(w.start)),datasets:[{label:'Connection',data:wks.map(w=>pct(w.conv,w.calls)),borderColor:'#94a3b8',borderDash:[4,4],tension:.3}].concat(RS.map(r=>({label:r.rate||r.code, data:wks.map(w=>{ const k=iso(w.start); return pct(cv.filter(c=>code(c)===r.code && iso(weekStart(parseDate(c.date)))===k).length, w.conv); }), borderColor:col(r), tension:.3})))},
+    options:Object.assign(baseOpts(true),{scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}})});
+  // A/B/C by list
+  const lists = [...new Set(log.map(r=>r.list).concat(cv.map(c=>c.list)).filter(l=>l && l!=='(unmatched)'))];
+  $('#hByList').textContent = RS.map(r=>r.code).join(' / ') + ' leads by list';
+  chart('chByList',{type:'bar',data:{labels:lists.map(shortList),datasets:RS.map(r=>({label:`${r.code} · ${r.label}`, data:lists.map(l=>cv.filter(c=>code(c)===r.code && c.list===l).length), backgroundColor:col(r), borderRadius:6, maxBarThickness:40}))},options:baseOpts(true)});
 }
 function baseOpts(legend){ return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:!!legend,position:'bottom'}},scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'},ticks:{precision:0}},x:{grid:{display:false}}}}; }
 const shortList = l => String(l||'').replace(/^.*?\|\s*/,'').replace(/\s*\|\s*HQ$/,'') || l;
