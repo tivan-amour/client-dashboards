@@ -275,6 +275,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
         <label>Email<input name="email" type="email"></label>
         <label>List<select name="list" data-opts="lists"></select></label>
         <label>Caller<select name="caller" data-opts="callers"></select></label>
+        <label>Booked via<select name="booked_via"><option value="Phone">Phone</option><option value="Email">Email</option></select></label>
         <label class="full">Caller notes (what they said, why it's a fit)<textarea name="caller_notes"></textarea></label>
         <div class="actions"><button type="button" class="btn ghost" data-cancel>Cancel</button><button class="btn">Save meeting</button></div>
       </form>
@@ -367,6 +368,7 @@ const ratings = () => opts('ratings').map(x=>{ const [code,label,rate]=x.split('
 const RATE_COLORS = {A:'#15803d',B:'#2563eb',C:'#d97706'};
 
 const TOOK = ['', 'Yes, it happened', 'No-show', 'Rescheduled', 'Cancelled'];
+const VIA = ['', 'Phone', 'Email'];
 const OUTCOME = ['', 'Good fit, next steps', 'Proposal / quote sent', 'Closed, won', 'Not a fit', 'Bad timing, revisit later', 'Wrong person'];
 
 // ---------- network ----------
@@ -588,7 +590,7 @@ function renderMeetings(){
         ${m.phone?`<div><span>Phone</span><a href="tel:${esc(m.phone)}">${esc(m.phone)}</a></div>`:''}
         ${m.email?`<div><span>Email</span><a href="mailto:${esc(m.email)}">${esc(m.email)}</a></div>`:''}
         ${m.list?`<div><span>List</span>${esc(shortList(m.list))}</div>`:''}
-        ${m.caller?`<div><span>Booked by</span>${esc(m.caller)}${m.booked_date?' · '+esc(nice(parseDate(m.booked_date))):''}</div>`:''}
+        ${m.caller?`<div><span>Booked by</span>${esc(m.caller)}${m.booked_via?' via '+esc(m.booked_via.toLowerCase()):''}${m.booked_date?' · '+esc(nice(parseDate(m.booked_date))):''}</div>`:''}
         ${m.recording_link?`<div><span>Call recording</span><a href="${esc(m.recording_link)}" target="_blank" rel="noopener">Listen ↗</a></div>`:''}
       </div>
       ${m.caller_notes?`<div class="cnotes"><b>Caller notes:</b> ${esc(m.caller_notes)}</div>`:''}
@@ -597,7 +599,7 @@ function renderMeetings(){
           <label>Name${inp('name',m.name)}</label><label>Title${inp('title',m.title)}</label><label>Company${inp('company',m.company)}</label>
           <label>Phone${inp('phone',m.phone)}</label><label>Email${inp('email',m.email)}</label>
           <label>Meeting date${inp('meeting_date',toISOish(m.meeting_date),'date')}</label><label>Booked on${inp('booked_date',toISOish(m.booked_date),'date')}</label>
-          <label>List${sel('list',m.list,lists.includes(m.list)?lists:[...lists,m.list])}</label><label>Caller${sel('caller',m.caller,callers.includes(m.caller)?callers:[...callers,m.caller])}</label>
+          <label>List${sel('list',m.list,lists.includes(m.list)?lists:[...lists,m.list])}</label><label>Caller${sel('caller',m.caller,callers.includes(m.caller)?callers:[...callers,m.caller])}</label><label>Booked via${sel('booked_via',m.booked_via||'',VIA)}</label>
           <label>Recording link${inp('recording_link',m.recording_link,'url')}</label>
           <label class="wide">Caller notes${ta('caller_notes',m.caller_notes)}</label>
           <div><button class="btn danger sm" data-del="Booked Meetings">Delete meeting</button></div>
@@ -716,7 +718,7 @@ function bindTable(tableSel, sheet, listKey){
     if(el.type==='number' && v!=='' && num(v)<0){ v='0'; el.value='0'; }
     row[f] = v;
     const ok = await saveRow(sheet, {id, [f]: v});
-    if(ok){ renderOverview(); renderLists(); if(listKey==='callLog' && ['calls','conversations','interested','meetings'].includes(f)) renderLog(); if(listKey==='meetings' && ['took_place','outcome','meeting_date','name','title','company','phone','email','list','caller','caller_notes','recording_link','booked_date'].includes(f) && !el.closest('details')) renderMeetings(); }
+    if(ok){ renderOverview(); renderLists(); if(listKey==='callLog' && ['calls','conversations','interested','meetings'].includes(f)) renderLog(); if(listKey==='meetings' && ['took_place','outcome','meeting_date','name','title','company','phone','email','list','caller','booked_via','caller_notes','recording_link','booked_date'].includes(f) && !el.closest('details')) renderMeetings(); }
   });
   $(tableSel).addEventListener('click', async e=>{
     const b = e.target.closest('[data-del]'); if(!b) return;
