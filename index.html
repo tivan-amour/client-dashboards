@@ -203,10 +203,11 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
 
     <div class="grid three section">
       <div class="card">
-        <h2>Current block <small id="blockLbl"></small></h2>
+        <h2><span id="blockTitle">Current block</span> <small id="blockLbl"></small></h2>
         <div class="row"><span class="big" id="blockNow">0</span><span class="muted" id="blockOf"></span></div>
         <div class="progress"><i id="blockBar" style="width:0"></i></div>
         <div class="row muted"><span id="blockDone"></span><span id="blockLeft"></span></div>
+        <div class="muted hidden" id="blockContract" style="font-size:12px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)"></div>
       </div>
       <div class="card">
         <h2>This week <small id="weekLbl"></small></h2>
@@ -454,11 +455,15 @@ function renderOverview(){
   // block
   const bs = num(S.settings.block_size)||375, price = num(S.settings.block_price)||0;
   const done = Math.floor(t.calls / bs), inBlock = t.calls - done*bs;
-  $('#blockLbl').textContent = `#${done+1} · ${bs} calls per block`;
+  const blkLbl = L('block_label','block'), total = num(S.settings.contract_calls)||0, nBlocks = total ? Math.ceil(total/bs) : 0;
+  $('#blockTitle').textContent = 'Current ' + blkLbl;
+  $('#blockLbl').textContent = nBlocks ? `${done+1} of ${nBlocks} · ${bs} calls${price?' · '+fmtMoney(price):''}` : `#${done+1} · ${bs} calls per ${blkLbl}`;
+  const bc = $('#blockContract'); bc.classList.toggle('hidden', !total);
+  if (total) bc.textContent = `${L('contract_label','Contract')}: ${fmtN(t.calls)} of ${fmtN(total)} calls (${fmtPct(pct(t.calls,total))})` + (S.settings.contract_note ? ' · ' + S.settings.contract_note : '');
   $('#blockNow').textContent = fmtN(inBlock);
   $('#blockOf').textContent = `of ${bs} calls`;
   $('#blockBar').style.width = Math.min(100, inBlock/bs*100) + '%';
-  $('#blockDone').textContent = `${done} block${done===1?'':'s'} completed`;
+  $('#blockDone').textContent = `${done} ${blkLbl}${done===1?'':'s'} completed`;
   $('#blockLeft').textContent = `${fmtN(bs-inBlock)} to go`;
 
   // week
