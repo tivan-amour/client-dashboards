@@ -469,6 +469,7 @@ function renderOverview(){
   // week
   const wt = num(S.settings.weekly_target)||375; const ws = weekStart(new Date());
   const wk = totals(log.filter(r=>{const d=parseDate(r.date); return d && d>=ws;}));
+  $('#weekLbl').closest('.card').classList.toggle('hidden', /^(no|false|0|hide)$/i.test(String(S.settings.show_week_card||'').trim()));
   $('#weekLbl').textContent = 'since ' + nice(ws);
   $('#weekNow').textContent = fmtN(wk.calls); $('#weekOf').textContent = `of ~${wt} target`;
   $('#weekBar').style.width = Math.min(100, wk.calls/wt*100) + '%';
