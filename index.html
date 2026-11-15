@@ -240,7 +240,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
     </div>
 
     <div class="grid two section hidden" id="dialSection">
-      <div class="card"><h2>Connect rate by number type <small>from Dialpad</small></h2><div class="chartbox"><canvas id="chPhoneType"></canvas></div></div>
+      <div class="card"><h2>Rates by number type <small>from Dialpad · first bar = all calls</small></h2><div class="chartbox"><canvas id="chPhoneType"></canvas></div></div>
       <div class="card"><h2>Calls and conversations by hour <small>local time of the call</small></h2><div class="chartbox"><canvas id="chHour"></canvas></div></div>
     </div>
   </section>
@@ -529,12 +529,14 @@ function renderOverview(){
 function renderDialpad(){
   const dc = S.dialpadCalls||[]; $('#dialSection').classList.toggle('hidden', !dc.length); if(!dc.length) return;
   const byConv = {}; S.conversations.forEach(c=>{ if(c.dialpad_call_id) byConv[c.dialpad_call_id]=1; });
-  const types = {}; dc.forEach(c=>{ const k=c.phone_type||'Unmatched'; (types[k]=types[k]||{n:0,conn:0}); types[k].n++; if(c.connected==='yes') types[k].conn++; });
-  const tk = Object.keys(types).sort((a,b)=>types[b].n-types[a].n);
-  chart('chPhoneType',{type:'bar',data:{labels:tk.map(k=>`${k} (${types[k].n})`),datasets:[{label:'Connect rate',data:tk.map(k=>pct(types[k].conn,types[k].n)),backgroundColor:'#2563eb',borderRadius:6,maxBarThickness:46}]},options:Object.assign(baseOpts(),{scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}})});
-  const hrs = {}; dc.forEach(c=>{ const h=parseInt(String(c.time||'').split(':')[0],10); if(isNaN(h)) return; (hrs[h]=hrs[h]||{n:0,conv:0}); hrs[h].n++; if(c.connected==='yes') hrs[h].conv++; });
+  const types = {}, addT = (k,c)=>{ const o=(types[k]=types[k]||{n:0,reach:0,conv:0}); o.n++; if(c.connected==='yes') o.reach++; if(c.conversation==='yes' || (!('conversation' in c) && c.rating)) o.conv++; };
+  dc.forEach(c=>{ addT('All calls',c); addT(c.phone_type||'Unmatched',c); });
+  const tk = ['All calls'].concat(Object.keys(types).filter(k=>k!=='All calls').sort((a,b)=>types[b].n-types[a].n));
+  const pctTip = {callbacks:{label:x=>`${x.dataset.label}: ${fmtPct(x.raw)}`}};
+  chart('chPhoneType',{type:'bar',data:{labels:tk.map(k=>`${k} (${types[k].n})`),datasets:[{label:'Connection rate (conversations ÷ calls)',data:tk.map(k=>pct(types[k].conv,types[k].n)),backgroundColor:tk.map(k=>k==='All calls'?'#1e3a8a':'#2563eb'),borderRadius:6,maxBarThickness:40},{label:'Reached anyone, incl. gatekeepers',data:tk.map(k=>pct(types[k].reach,types[k].n)),backgroundColor:tk.map(k=>k==='All calls'?'#94a3b8':'#cbd5e1'),borderRadius:6,maxBarThickness:40}]},options:Object.assign(baseOpts(true),{plugins:{legend:{display:true,position:'bottom'},tooltip:pctTip},scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}})});
+  const hrs = {}; dc.forEach(c=>{ const h=parseInt(String(c.time||'').split(':')[0],10); if(isNaN(h)) return; (hrs[h]=hrs[h]||{n:0,reach:0,conv:0}); hrs[h].n++; if(c.connected==='yes') hrs[h].reach++; if(c.conversation==='yes' || (!('conversation' in c) && c.rating)) hrs[h].conv++; });
   const hk = Object.keys(hrs).map(Number).sort((a,b)=>a-b); const hl = h=> (h%12||12)+(h<12?'a':'p');
-  chart('chHour',{type:'bar',data:{labels:hk.map(hl),datasets:[{label:'Calls',data:hk.map(h=>hrs[h].n),backgroundColor:'#cbd5e1',borderRadius:6,maxBarThickness:40},{label:'Connected',data:hk.map(h=>hrs[h].conv),backgroundColor:'#0f766e',borderRadius:6,maxBarThickness:40}]},options:baseOpts(true)});
+  chart('chHour',{type:'bar',data:{labels:hk.map(hl),datasets:[{label:'Calls',data:hk.map(h=>hrs[h].n),backgroundColor:'#cbd5e1',borderRadius:6,maxBarThickness:40},{label:'Reached anyone',data:hk.map(h=>hrs[h].reach),backgroundColor:'#99f6e4',borderRadius:6,maxBarThickness:40},{label:'Conversations',data:hk.map(h=>hrs[h].conv),backgroundColor:'#0f766e',borderRadius:6,maxBarThickness:40}]},options:baseOpts(true)});
 }
 function renderRatedOverview(log, t){
   const RS = ratings(), col = r => RATE_COLORS[r.code] || '#64748b';
